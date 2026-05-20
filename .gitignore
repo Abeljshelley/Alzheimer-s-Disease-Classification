@@ -1,0 +1,27 @@
+# Dataset
+*.csv
+
+# Jupyter notebooks
+*.ipynb
+
+# ML model files
+*.pkl
+*.h5
+*.pt
+*.pth
+
+# Virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Jupyter cache
+.ipynb_checkpoints/
+
+# IDE files
+.vscode/
+
+# Environment secrets
+.env

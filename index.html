@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroDx — Alzheimer's Prediction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0d0d0f;
+  --surface:   #141417;
+  --card:      #1b1b1f;
+  --border:    rgba(255,255,255,0.07);
+  --border-hi: rgba(255,255,255,0.14);
+  --text:      #e8e8ec;
+  --muted:     #666670;
+  --accent:    #c8b8ff;
+  --accent2:   #7dd3fc;
+  --cn:        #5ef0b0;
+  --mci:       #ffd166;
+  --ad:        #ff6b6b;
+  --radius:    12px;
+}
+
+html { font-size: 15px; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.6;
+}
+
+/* ── Layout ── */
+.layout {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Left Panel ── */
+.panel-left {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.logo-zone {
+  padding: 32px 32px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.logo {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.7rem;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.logo span { color: var(--accent); font-style: italic; }
+.tagline {
+  font-size: 0.73rem;
+  color: var(--muted);
+  margin-top: 4px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── Model Toggle ── */
+.model-toggle-zone {
+  padding: 16px 32px;
+  border-bottom: 1px solid var(--border);
+}
+.toggle-label {
+  font-size: 0.65rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 10px;
+}
+.model-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 3px;
+}
+.model-btn {
+  padding: 9px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.73rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1.3;
+}
+.model-btn .mb-name { font-weight: 500; }
+.model-btn .mb-sub  { font-size: 0.6rem; color: inherit; opacity: 0.6; }
+.model-btn.active.xgb {
+  background: rgba(200,184,255,0.12);
+  color: var(--accent);
+  border: 1px solid rgba(200,184,255,0.2);
+}
+.model-btn.active.lr {
+  background: rgba(125,211,252,0.12);
+  color: var(--accent2);
+  border: 1px solid rgba(125,211,252,0.2);
+}
+.model-btn:not(.active):hover {
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+}
+
+/* active model indicator strip at top */
+.model-indicator {
+  height: 2px;
+  width: 100%;
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+.model-indicator.xgb { background: linear-gradient(90deg, var(--accent), transparent); }
+.model-indicator.lr  { background: linear-gradient(90deg, var(--accent2), transparent); }
+
+/* ── Section headers ── */
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 32px 8px;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.section-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px; height: 20px;
+  border-radius: 6px;
+  background: var(--border-hi);
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  flex-shrink: 0;
+}
+
+/* ── Field grid ── */
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 4px 32px 0;
+}
+.field-grid.single { grid-template-columns: 1fr; }
+
+.field { display: flex; flex-direction: column; gap: 5px; }
+
+label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: 'DM Mono', monospace;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+label .req { color: var(--accent); font-size: 0.75rem; line-height: 1; }
+
+input, select {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.82rem;
+  padding: 9px 12px;
+  width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  -webkit-appearance: none;
+}
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(200,184,255,0.12);
+}
+input::placeholder { color: var(--muted); }
+select option { background: var(--card); }
+
+.field.invalid input, .field.invalid select {
+  border-color: var(--ad);
+  box-shadow: 0 0 0 3px rgba(255,107,107,0.1);
+}
+
+/* ── Predict button ── */
+.btn-zone { padding: 20px 32px 32px; }
+.predict-btn {
+  width: 100%;
+  padding: 14px 24px;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent);
+  color: #0d0d0f;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s, background 0.3s;
+  position: relative;
+}
+.predict-btn.lr-mode { background: var(--accent2); }
+.predict-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+.predict-btn:active:not(:disabled) { transform: translateY(0); }
+.predict-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+.predict-btn .spinner {
+  display: none;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(13,13,15,0.3);
+  border-top-color: #0d0d0f;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto;
+}
+.predict-btn.loading .label { display: none; }
+.predict-btn.loading .spinner { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.hint-text {
+  font-size: 0.67rem;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 10px;
+  font-family: 'DM Mono', monospace;
+}
+.hint-text b { color: var(--text); }
+
+/* ── Right Panel ── */
+.panel-right {
+  padding: 48px 56px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.right-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  opacity: 0.22;
+}
+.placeholder-icon {
+  width: 64px; height: 64px;
+  border: 2px solid var(--border-hi);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.right-placeholder p {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.06em;
+}
+
+/* ── Results ── */
+.results { animation: fadeUp 0.4s ease; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Model badge in results */
+.model-result-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 0.65rem;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.model-result-badge.xgb {
+  background: rgba(200,184,255,0.1);
+  color: var(--accent);
+  border: 1px solid rgba(200,184,255,0.18);
+}
+.model-result-badge.lr {
+  background: rgba(125,211,252,0.1);
+  color: var(--accent2);
+  border: 1px solid rgba(125,211,252,0.18);
+}
+.badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+.result-header { margin-bottom: 32px; }
+.tier-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 100px;
+  background: var(--border);
+  font-size: 0.66rem;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+.tier-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.result-header h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 2.5rem;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+.result-header h2.cn  { color: var(--cn);  }
+.result-header h2.mci { color: var(--mci); }
+.result-header h2.ad  { color: var(--ad);  }
+.result-header .sub {
+  font-size: 0.77rem;
+  color: var(--muted);
+  margin-top: 6px;
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── Score cards ── */
+.score-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.metric-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  transition: border-color 0.15s;
+}
+.metric-card:hover { border-color: var(--border-hi); }
+.metric-card .mc-label {
+  font-size: 0.65rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 8px;
+}
+.metric-card .mc-value {
+  font-family: 'DM Serif Display', serif;
+  font-size: 2.2rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+.metric-card .mc-unit {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  margin-top: 4px;
+}
+
+/* ── Probability bars ── */
+.prob-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+.prob-title {
+  font-size: 0.65rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 16px;
+}
+.prob-bars { display: flex; flex-direction: column; gap: 12px; }
+.prob-row { display: flex; align-items: center; gap: 12px; }
+.prob-row .lbl {
+  width: 36px;
+  font-size: 0.7rem;
+  font-family: 'DM Mono', monospace;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.8s cubic-bezier(0.23,1,0.32,1);
+  width: 0;
+}
+.bar-fill.cn  { background: var(--cn);  }
+.bar-fill.mci { background: var(--mci); }
+.bar-fill.ad  { background: var(--ad);  }
+.prob-row .pct {
+  width: 44px;
+  text-align: right;
+  font-size: 0.7rem;
+  font-family: 'DM Mono', monospace;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+/* ── Consensus badge ── */
+.consensus-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 24px;
+}
+.consensus-badge.stable {
+  background: rgba(94,240,176,0.08);
+  border: 1px solid rgba(94,240,176,0.2);
+  color: var(--cn);
+}
+.consensus-badge.unstable {
+  background: rgba(255,209,102,0.08);
+  border: 1px solid rgba(255,209,102,0.2);
+  color: var(--mci);
+}
+.consensus-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+/* ── Tier breakdown table ── */
+.breakdown-title {
+  font-size: 0.65rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 10px;
+}
+.tier-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: visible; /* allow tooltips to escape */
+  position: relative;
+}
+/* inner clip for border-radius look without cutting tooltips */
+.tier-table-inner {
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.tier-row {
+  display: grid;
+  grid-template-columns: 72px 1fr 64px 80px 90px;
+  border-bottom: 1px solid var(--border);
+  position: relative; /* tooltip anchor */
+  transition: background 0.12s;
+  cursor: default;
+}
+.tier-row:last-child { border-bottom: none; }
+.tier-row.header     { background: var(--surface); cursor: default; }
+.tier-row:not(.header):hover { background: rgba(255,255,255,0.025); }
+.tier-row.active-tier { background: rgba(200,184,255,0.04); }
+
+.tier-cell {
+  padding: 11px 14px;
+  font-size: 0.7rem;
+  font-family: 'DM Mono', monospace;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+.tier-row.header .tier-cell {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.tier-cell.pred { font-weight: 500; font-size: 0.76rem; }
+.tier-cell.pred.cn  { color: var(--cn);  }
+.tier-cell.pred.mci { color: var(--mci); }
+.tier-cell.pred.ad  { color: var(--ad);  }
+.tier-cell.val { color: var(--text); }
+.active-marker {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* ── Tooltip — JS-positioned, no CSS overflow clipping ── */
+.tier-tooltip {
+  position: fixed; /* fixed so it's never clipped by any parent */
+  background: #25252b;
+  border: 1px solid var(--border-hi);
+  border-radius: 10px;
+  padding: 14px 16px;
+  width: 200px;
+  font-size: 0.7rem;
+  font-family: 'DM Mono', monospace;
+  color: var(--text);
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+}
+.tier-tooltip.visible { opacity: 1; }
+.tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 6px;
+}
+.tt-row:last-child { margin-bottom: 0; }
+.tt-k { color: var(--muted); font-size: 0.65rem; letter-spacing: 0.08em; }
+.tt-v { color: var(--text); }
+
+/* ── Error banner ── */
+.error-banner {
+  background: rgba(255,107,107,0.08);
+  border: 1px solid rgba(255,107,107,0.25);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  font-size: 0.78rem;
+  color: var(--ad);
+  font-family: 'DM Mono', monospace;
+  animation: fadeUp 0.3s ease;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 4px; }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .panel-left { border-right: none; border-bottom: 1px solid var(--border); }
+  .panel-right { padding: 28px 20px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── LEFT PANEL ── -->
+  <aside class="panel-left">
+    <div class="model-indicator xgb" id="modelIndicator"></div>
+
+    <div class="logo-zone">
+      <div class="logo">Neuro<span>Dx</span></div>
+      <div class="tagline">Alzheimer's Prediction · ADNI Dataset</div>
+    </div>
+
+    <!-- Model Toggle -->
+    <div class="model-toggle-zone">
+      <div class="toggle-label">Model</div>
+      <div class="model-toggle">
+        <button class="model-btn xgb active" id="btnXgb" onclick="setModel('xgboost')">
+          <span class="mb-name">XGBoost</span>
+          <span class="mb-sub">Gradient Boosted Trees</span>
+        </button>
+        <button class="model-btn lr" id="btnLr" onclick="setModel('logistic')">
+          <span class="mb-name">Logistic Reg.</span>
+          <span class="mb-sub">Scaled + LBFGS</span>
+        </button>
+      </div>
+    </div>
+
+    <form id="predForm" novalidate>
+
+      <!-- DEMOGRAPHICS — mandatory -->
+      <div class="section-label">
+        <span class="section-badge">T1</span>
+        Demographics
+        <span style="color:var(--accent);font-size:0.58rem;margin-left:2px;">Required</span>
+      </div>
+      <div class="field-grid">
+        <div class="field" id="f-AGE">
+          <label>Age <span class="req">✦</span></label>
+          <input type="number" name="AGE" placeholder="e.g. 72" min="50" max="110" step="0.1">
+        </div>
+        <div class="field" id="f-PTGENDER">
+          <label>Sex <span class="req">✦</span></label>
+          <select name="PTGENDER">
+            <option value="">Select</option>
+            <option value="1">Male (1)</option>
+            <option value="2">Female (2)</option>
+          </select>
+        </div>
+        <div class="field" id="f-PTEDUCAT">
+          <label>Education yrs <span class="req">✦</span></label>
+          <input type="number" name="PTEDUCAT" placeholder="e.g. 16" min="0" max="30" step="1">
+        </div>
+        <div class="field" id="f-PTNOTRT">
+          <label>Work status <span class="req">✦</span></label>
+          <select name="PTNOTRT">
+            <option value="">Select</option>
+            <option value="0">Retired (0)</option>
+            <option value="1">Working (1)</option>
+          </select>
+        </div>
+        <div class="field" id="f-GENOTYPE">
+          <label>APOE ε4 <span class="req">✦</span></label>
+          <select name="GENOTYPE">
+            <option value="">Select</option>
+            <option value="0">No alleles (0)</option>
+            <option value="1">One allele (1)</option>
+            <option value="2">Two alleles (2)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- MMSE -->
+      <div class="section-label">
+        <span class="section-badge">T3</span>
+        MMSE
+      </div>
+      <div class="field-grid single">
+        <div class="field">
+          <label>MMSE Score</label>
+          <input type="number" name="MMSCORE" placeholder="0 – 30" min="0" max="30" step="0.1">
+        </div>
+      </div>
+
+      <!-- CDR -->
+      <div class="section-label">
+        <span class="section-badge">T4</span>
+        CDR
+      </div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Memory (CDR)</label>
+          <select name="CDMEMORY">
+            <option value="">Select</option>
+            <option value="0">0 — None</option>
+            <option value="0.5">0.5 — Questionable</option>
+            <option value="1">1 — Mild</option>
+            <option value="2">2 — Moderate</option>
+            <option value="3">3 — Severe</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Self-Care (CDR)</label>
+          <select name="CDCARE">
+            <option value="">Select</option>
+            <option value="0">0 — None</option>
+            <option value="0.5">0.5 — Questionable</option>
+            <option value="1">1 — Mild</option>
+            <option value="2">2 — Moderate</option>
+            <option value="3">3 — Severe</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- MRI -->
+      <div class="section-label">
+        <span class="section-badge">T2</span>
+        MRI — Bilateral Volumes (mm³)
+      </div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Hippocampus</label>
+          <input type="number" name="BILATERAL_HIPP_VOL" placeholder="e.g. 1749" step="0.001">
+        </div>
+        <div class="field">
+          <label>Entorhinal Cx</label>
+          <input type="number" name="BILATERAL_ERC_VOL" placeholder="e.g. 258" step="0.001">
+        </div>
+        <div class="field">
+          <label>BA35</label>
+          <input type="number" name="BILATERAL_BA35_VOL" placeholder="e.g. 400" step="0.001">
+        </div>
+        <div class="field">
+          <label>PHC</label>
+          <input type="number" name="BILATERAL_PHC_VOL" placeholder="e.g. 788" step="0.001">
+        </div>
+        <div class="field">
+          <label>Sulcus</label>
+          <input type="number" name="BILATERAL_SULCUS_VOL" placeholder="e.g. 424" step="0.001">
+        </div>
+      </div>
+
+      <!-- PET -->
+      <div class="section-label">
+        <span class="section-badge">T7</span>
+        Amyloid PET
+      </div>
+      <div class="field-grid single">
+        <div class="field">
+          <label>PHC Centiloids</label>
+          <input type="number" name="PHC_CENTILOIDS" placeholder="e.g. 70.0" step="0.1">
+        </div>
+      </div>
+
+      <div class="btn-zone">
+        <button type="submit" class="predict-btn" id="predictBtn" disabled>
+          <span class="label">Run Prediction</span>
+          <span class="spinner"></span>
+        </button>
+        <p class="hint-text"><b>✦</b> Required — enables Tier 1 minimum</p>
+      </div>
+
+    </form>
+  </aside>
+
+  <!-- ── RIGHT PANEL ── -->
+  <main class="panel-right" id="resultPanel">
+    <div class="right-placeholder" id="placeholder">
+      <div class="placeholder-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 8v4M12 16h.01"/>
+        </svg>
+      </div>
+      <p>Enter patient data and run prediction</p>
+    </div>
+    <div id="resultsContainer"></div>
+  </main>
+
+</div>
+
+<!-- single shared tooltip element, appended to body so it's never clipped -->
+<div class="tier-tooltip" id="sharedTooltip"></div>
+
+<script>
+const API = window.location.origin;
+
+const form      = document.getElementById('predForm');
+const btn       = document.getElementById('predictBtn');
+const panel     = document.getElementById('resultsContainer');
+const holder    = document.getElementById('placeholder');
+const indicator = document.getElementById('modelIndicator');
+const tooltip   = document.getElementById('sharedTooltip');
+
+const REQUIRED  = ['AGE','PTGENDER','PTEDUCAT','PTNOTRT','GENOTYPE'];
+let   activeModel = 'xgboost';
+
+// ── Model toggle ──────────────────────────────────────────────────────────────
+function setModel(type) {
+  activeModel = type;
+  document.getElementById('btnXgb').classList.toggle('active', type === 'xgboost');
+  document.getElementById('btnLr' ).classList.toggle('active', type === 'logistic');
+  indicator.className = `model-indicator ${type === 'xgboost' ? 'xgb' : 'lr'}`;
+  btn.classList.toggle('lr-mode', type === 'logistic');
+}
+
+// ── Live validation ───────────────────────────────────────────────────────────
+form.addEventListener('input', () => {
+  const allFilled = REQUIRED.every(name => {
+    const el = form.querySelector(`[name="${name}"]`);
+    return el && el.value.trim() !== '';
+  });
+  btn.disabled = !allFilled;
+});
+
+// ── Submit ────────────────────────────────────────────────────────────────────
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+
+  let valid = true;
+  REQUIRED.forEach(name => {
+    const el   = form.querySelector(`[name="${name}"]`);
+    const wrap = document.getElementById(`f-${name}`);
+    if (!el || el.value.trim() === '') {
+      wrap?.classList.add('invalid');
+      valid = false;
+    } else {
+      wrap?.classList.remove('invalid');
+    }
+  });
+  if (!valid) return;
+
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  const data = { model: activeModel };
+  new FormData(form).forEach((v, k) => { if (v.trim() !== '') data[k] = v; });
+
+  try {
+    const res  = await fetch(`${API}/predict`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    renderResults(json);
+  } catch {
+    renderError('Could not connect to the prediction server. Make sure app.py is running on port 5050.');
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+});
+
+// ── Render error ──────────────────────────────────────────────────────────────
+function renderError(msg) {
+  holder.style.display = 'none';
+  panel.innerHTML = `<div class="error-banner">⚠ ${msg}</div>`;
+}
+
+// ── Render results ────────────────────────────────────────────────────────────
+const TIER_LABEL_MAP = {
+  1:'Demographics Only', 2:'Demographics + MRI', 3:'Demographics + MMSE',
+  4:'Demographics + CDR', 5:'Demographics + MMSE + CDR',
+  6:'Demographics + MRI + MMSE + CDR', 7:'Demographics + MRI + MMSE + CDR + PET'
+};
+
+function renderResults(r) {
+  if (r.error) { renderError(r.error); return; }
+
+  holder.style.display = 'none';
+
+  const cls      = r.predictedClass.toLowerCase();
+  const isStable = r.consensus.startsWith('Stable');
+  const modelTag = activeModel === 'xgboost' ? 'XGBoost' : 'Logistic Regression';
+  const badgeCls = activeModel === 'xgboost' ? 'xgb' : 'lr';
+
+  const fullName = r.predictedClass === 'CN'  ? 'Cognitively Normal'
+                 : r.predictedClass === 'MCI' ? 'Mild Cognitive Impairment'
+                 :                              'Alzheimer\'s Disease';
+
+  // Build tier rows
+  let tierRows = '';
+  for (const [t, info] of Object.entries(r.tierBreakdown)) {
+    const isActive = parseInt(t) === r.activeTier;
+    const pcls     = info.prediction.toLowerCase();
+    tierRows += `
+    <div class="tier-row ${isActive ? 'active-tier' : ''}"
+         data-tt='${JSON.stringify({pCN:info.pCN, pMCI:info.pMCI, pAD:info.pAD, score:info.score, conf:info.confidence})}'>
+      <div class="tier-cell">${isActive ? '<span class="active-marker"></span>' : ''} T${t}</div>
+      <div class="tier-cell" style="color:var(--text);font-size:0.66rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${TIER_LABEL_MAP[t]||''}</div>
+      <div class="tier-cell pred ${pcls}">${info.prediction}</div>
+      <div class="tier-cell val">${info.score}</div>
+      <div class="tier-cell val">${info.confidence}%</div>
+    </div>`;
+  }
+
+  panel.innerHTML = `
+  <div class="results">
+    <div class="result-header">
+      <div class="model-result-badge ${badgeCls}">
+        <span class="badge-dot"></span>${modelTag}
+      </div>
+      <div class="tier-pill">
+        <span class="tier-dot"></span>
+        Active · Tier ${r.activeTier} — ${r.tierLabel}
+      </div>
+      <h2 class="${cls}">${fullName}</h2>
+      <div class="sub">Predicted class: ${r.predictedClass} · Tier ${r.activeTier} model</div>
+    </div>
+
+    <div class="score-row">
+      <div class="metric-card">
+        <div class="mc-label">Risk Score</div>
+        <div class="mc-value" style="color:var(--${cls})">${r.score}</div>
+        <div class="mc-unit">0 = CN &nbsp;·&nbsp; 50 = MCI &nbsp;·&nbsp; 100 = AD</div>
+      </div>
+      <div class="metric-card">
+        <div class="mc-label">Model Confidence</div>
+        <div class="mc-value" style="color:var(--${cls})">${r.confidence}<small style="font-size:1.1rem">%</small></div>
+        <div class="mc-unit">max class probability</div>
+      </div>
+    </div>
+
+    <div class="prob-section">
+      <div class="prob-title">Class Probabilities</div>
+      <div class="prob-bars">
+        <div class="prob-row">
+          <span class="lbl">CN</span>
+          <div class="bar-track"><div class="bar-fill cn" data-pct="${r.pCN}"></div></div>
+          <span class="pct">${r.pCN}%</span>
+        </div>
+        <div class="prob-row">
+          <span class="lbl">MCI</span>
+          <div class="bar-track"><div class="bar-fill mci" data-pct="${r.pMCI}"></div></div>
+          <span class="pct">${r.pMCI}%</span>
+        </div>
+        <div class="prob-row">
+          <span class="lbl">AD</span>
+          <div class="bar-track"><div class="bar-fill ad" data-pct="${r.pAD}"></div></div>
+          <span class="pct">${r.pAD}%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="consensus-badge ${isStable ? 'stable' : 'unstable'}">
+      <span class="consensus-dot"></span>
+      ${r.consensus}
+    </div>
+
+    <div class="breakdown-title">Tier Breakdown — hover any row for probability details</div>
+    <div class="tier-table">
+      <div class="tier-table-inner">
+        <div class="tier-row header">
+          <div class="tier-cell">Tier</div>
+          <div class="tier-cell">Label</div>
+          <div class="tier-cell">Result</div>
+          <div class="tier-cell">Score</div>
+          <div class="tier-cell">Confidence</div>
+        </div>
+        ${tierRows}
+      </div>
+    </div>
+  </div>`;
+
+  // Animate bars
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.bar-fill').forEach(el => {
+      el.style.width = el.dataset.pct + '%';
+    });
+  });
+
+  // Attach tooltip hover
+  attachTooltips();
+}
+
+// ── Tooltip — JS-positioned to avoid any overflow clipping ────────────────────
+function attachTooltips() {
+  const rows = document.querySelectorAll('.tier-row:not(.header)[data-tt]');
+  const TT_WIDTH  = 200;
+  const TT_HEIGHT = 130; // approximate
+  const MARGIN    = 10;
+
+  rows.forEach(row => {
+    row.addEventListener('mouseenter', e => {
+      const data = JSON.parse(row.dataset.tt);
+      tooltip.innerHTML = `
+        <div class="tt-row"><span class="tt-k">P(CN)</span><span class="tt-v">${data.pCN}%</span></div>
+        <div class="tt-row"><span class="tt-k">P(MCI)</span><span class="tt-v">${data.pMCI}%</span></div>
+        <div class="tt-row"><span class="tt-k">P(AD)</span><span class="tt-v">${data.pAD}%</span></div>
+        <div class="tt-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.07)">
+          <span class="tt-k">Score</span><span class="tt-v">${data.score}</span>
+        </div>
+        <div class="tt-row"><span class="tt-k">Confidence</span><span class="tt-v">${data.conf}%</span></div>`;
+
+      positionTooltip(row);
+      tooltip.classList.add('visible');
+    });
+
+    row.addEventListener('mousemove', () => positionTooltip(row));
+
+    row.addEventListener('mouseleave', () => {
+      tooltip.classList.remove('visible');
+    });
+  });
+
+  function positionTooltip(row) {
+    const rect   = row.getBoundingClientRect();
+    const vw     = window.innerWidth;
+    const vh     = window.innerHeight;
+
+    // Default: above the row, centred
+    let left = rect.left + rect.width / 2 - TT_WIDTH / 2;
+    let top  = rect.top - TT_HEIGHT - MARGIN;
+
+    // If not enough space above, show below
+    if (top < MARGIN) {
+      top = rect.bottom + MARGIN;
+    }
+
+    // Clamp horizontally
+    left = Math.max(MARGIN, Math.min(left, vw - TT_WIDTH - MARGIN));
+
+    tooltip.style.left = left + 'px';
+    tooltip.style.top  = top  + 'px';
+  }
+}
+</script>
+</body>
+</html>
